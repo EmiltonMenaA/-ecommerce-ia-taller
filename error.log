@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "C:\Users\aceve\-ecommerce-ia-taller\main.py", line 9, in <module>
+    from app.infrastructure.api.main import app
+  File "C:\Users\aceve\-ecommerce-ia-taller\app\infrastructure\api\__init__.py", line 2, in <module>
+    from app.infrastructure.api.main import app
+  File "C:\Users\aceve\-ecommerce-ia-taller\app\infrastructure\api\main.py", line 2, in <module>
+    from fastapi import FastAPI
+ModuleNotFoundError: No module named 'fastapi'
