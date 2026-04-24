@@ -1,10 +1,9 @@
 """Implementación de repositorio de mensajes de chat con SQLite y SQLAlchemy."""
 from sqlalchemy.orm import Session
 from typing import List
-from app.domain.entities.chat_message import ChatMessage
+from app.domain.entities import ChatMessage
 from app.domain.repositories import IChatRepository
 from app.infrastructure.database.models import ChatMessageModel
-from datetime import datetime
 
 
 class ChatRepository(IChatRepository):

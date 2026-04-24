@@ -1,17 +1,24 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict
+
+from app.domain.entities import ChatMessage, Product
 
 
 class IGeminiService(ABC):
     """Contrato para servicios que generan respuestas usando un modelo Gemini."""
 
     @abstractmethod
-    def get_response(self, message: str, context: Dict[str, Any]) -> str:
-        """Genera una respuesta de texto usando mensaje y contexto conversacional.
+    def get_response(
+        self,
+        user_message: str,
+        history: list[ChatMessage],
+        products: list[Product],
+    ) -> str:
+        """Genera una respuesta de texto usando mensaje, historial y catalogo.
 
         Parametros:
-            message: Mensaje actual del usuario.
-            context: Informacion de apoyo para responder (historial, productos, etc.).
+            user_message: Mensaje actual del usuario.
+            history: Historial de conversacion de la sesion.
+            products: Productos disponibles en el catalogo.
 
         Retorna:
             Respuesta generada por el modelo.

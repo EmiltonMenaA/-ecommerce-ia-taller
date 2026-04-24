@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import List
 from uuid import uuid4
 
 from app.application.dtos import (
@@ -131,6 +131,21 @@ class ChatService:
             messages=[self._message_to_dto(message) for message in history],
         )
 
+    def delete_chat_history(self, session_id: str) -> None:
+        """Elimina el historial completo de una sesion.
+
+        Parametros:
+            session_id: Identificador de la sesion a eliminar.
+
+        Lanza:
+            ChatSessionNotFoundError: Si la sesion no existe.
+        """
+        deleted = self.chat_repository.delete_session(session_id)
+        if not deleted:
+            raise ChatSessionNotFoundError(
+                f"No existe historial para la sesion '{session_id}'."
+            )
+
     def _build_prompt(self, context: ChatContext, user_message: str) -> str:
         """Construye un prompt enriquecido con catalogo e historial de conversacion.
 
@@ -167,7 +182,11 @@ class ChatService:
             GeminiAPIError: Si ocurre un error o la respuesta es vacia.
         """
         try:
-            response = self.gemini_service.get_response(user_message, context.history, context.products)
+            response = self.gemini_service.get_response(
+                user_message=user_message,
+                history=context.history,
+                products=context.products,
+            )
         except Exception as exc:
             raise GeminiAPIError("Error al generar respuesta con Gemini.") from exc
 
@@ -175,41 +194,6 @@ class ChatService:
         if not cleaned_response:
             raise GeminiAPIError("Gemini devolvio una respuesta vacia.")
         return cleaned_response
-
-    def _serialize_context(self, context: ChatContext) -> Dict[str, Any]:
-        """Serializa ChatContext en una estructura util para servicios de IA.
-
-        Parametros:
-            context: Contexto de sesion que incluye historial y productos.
-
-        Retorna:
-            Diccionario con datos listos para consumir por IGeminiService.
-        """
-        return {
-            "session_id": context.session_id,
-            "products": [
-                {
-                    "id": product.id,
-                    "name": product.name,
-                    "brand": product.brand,
-                    "category": product.category,
-                    "size": product.size,
-                    "color": product.color,
-                    "price": product.price,
-                    "stock": product.stock,
-                }
-                for product in context.products
-            ],
-            "history": [
-                {
-                    "session_id": message.session_id,
-                    "role": message.role,
-                    "message": message.message,
-                    "timestamp": message.timestamp.astimezone(timezone.utc).isoformat(),
-                }
-                for message in context.history
-            ],
-        }
 
     def _format_products(self, products: List[Product]) -> str:
         """Convierte el catalogo a texto legible para incluirlo en el prompt."""

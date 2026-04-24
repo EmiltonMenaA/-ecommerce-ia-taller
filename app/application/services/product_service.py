@@ -1,7 +1,4 @@
-from typing import List
-from uuid import uuid4
-
-from app.application.dtos import CreateProductDTO, ProductDTO
+from app.application.dtos import CreateProductDTO, ProductDTO, UpdateProductDTO
 from app.domain import IProductRepository, InvalidPriceError, Product, ProductNotFoundError
 
 
@@ -16,7 +13,7 @@ class ProductService:
         """
         self.product_repository = product_repository
 
-    def get_all_products(self) -> List[ProductDTO]:
+    def get_all_products(self) -> list[ProductDTO]:
         """Obtiene todos los productos y los transforma a DTOs.
 
         Retorna:
@@ -25,7 +22,7 @@ class ProductService:
         products = self.product_repository.get_all()
         return [self._entity_to_dto(product) for product in products]
 
-    def get_product_by_id(self, product_id: int) -> ProductDTO:
+    def get_product_by_id(self, product_id: str) -> ProductDTO:
         """Obtiene un producto por su identificador.
 
         Args:
@@ -37,14 +34,14 @@ class ProductService:
         Lanza:
             ProductNotFoundError: Si no existe un producto para el id indicado.
         """
-        product = self.product_repository.get_by_id(str(product_id))
+        product = self.product_repository.get_by_id(product_id)
         if product is None:
             raise ProductNotFoundError(
                 f"No existe un producto con id '{product_id}'."
             )
         return self._entity_to_dto(product)
 
-    def get_products_by_brand(self, brand: str) -> List[ProductDTO]:
+    def get_products_by_brand(self, brand: str) -> list[ProductDTO]:
         """Filtra productos por marca y retorna DTOs.
 
         Args:
@@ -56,7 +53,7 @@ class ProductService:
         products = self.product_repository.get_by_brand(brand)
         return [self._entity_to_dto(product) for product in products]
 
-    def get_products_by_category(self, category: str) -> List[ProductDTO]:
+    def get_products_by_category(self, category: str) -> list[ProductDTO]:
         """Filtra productos por categoria y retorna DTOs.
 
         Args:
@@ -84,7 +81,7 @@ class ProductService:
             raise InvalidPriceError("El precio del producto debe ser mayor a 0.")
 
         new_product = Product(
-            id=self._generate_product_id(),
+            id="",
             name=dto.name,
             brand=dto.brand,
             category=dto.category,
@@ -95,6 +92,55 @@ class ProductService:
         )
         saved_product = self.product_repository.save(new_product)
         return self._entity_to_dto(saved_product)
+
+    def update_product(self, product_id: str, dto: UpdateProductDTO) -> ProductDTO:
+        """Actualiza un producto existente a partir de un DTO de entrada.
+
+        Args:
+            product_id: Identificador del producto a actualizar.
+            dto: Datos nuevos del producto.
+
+        Retorna:
+            Producto actualizado en formato ProductDTO.
+
+        Lanza:
+            InvalidPriceError: Si el precio no cumple reglas del dominio.
+            ProductNotFoundError: Si el producto no existe.
+        """
+        if dto.price <= 0:
+            raise InvalidPriceError("El precio del producto debe ser mayor a 0.")
+
+        product = Product(
+            id=product_id,
+            name=dto.name,
+            brand=dto.brand,
+            category=dto.category,
+            size=dto.size,
+            color=dto.color,
+            price=dto.price,
+            stock=dto.stock,
+        )
+        updated_product = self.product_repository.update(product_id, product)
+        if updated_product is None:
+            raise ProductNotFoundError(
+                f"No existe un producto con id '{product_id}'."
+            )
+        return self._entity_to_dto(updated_product)
+
+    def delete_product(self, product_id: str) -> None:
+        """Elimina un producto existente por identificador.
+
+        Args:
+            product_id: Identificador del producto a eliminar.
+
+        Lanza:
+            ProductNotFoundError: Si el producto no existe.
+        """
+        deleted = self.product_repository.delete(product_id)
+        if not deleted:
+            raise ProductNotFoundError(
+                f"No existe un producto con id '{product_id}'."
+            )
 
     def _entity_to_dto(self, product: Product) -> ProductDTO:
         """Convierte una entidad Product del dominio a ProductDTO.
@@ -116,11 +162,3 @@ class ProductService:
             stock=product.stock,
         )
 
-    @staticmethod
-    def _generate_product_id() -> str:
-        """Genera un identificador estable para nuevos productos.
-
-        Retorna:
-            Identificador con prefijo 'prod_'.
-        """
-        return f"prod_{uuid4().hex[:12]}"

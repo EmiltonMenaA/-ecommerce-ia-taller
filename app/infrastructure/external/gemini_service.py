@@ -3,11 +3,11 @@ import os
 from typing import List
 
 import google.generativeai as genai
-from app.domain.entities.product import Product
-from app.domain.entities.chat_message import ChatMessage
+from app.domain import IGeminiService
+from app.domain.entities import ChatMessage, Product
 
 
-class GeminiService:
+class GeminiService(IGeminiService):
     """Servicio para integración con Google Generative AI (Gemini).
 
     Maneja la comunicación con la API de Google Gemini para generar

@@ -1,5 +1,4 @@
-from app.domain.entities.chat_message import ChatMessage
-from app.domain.entities.product import Product
+from app.domain.entities import ChatMessage, Product
 from app.domain.exceptions import (
 	ChatSessionNotFoundError,
 	DomainException,

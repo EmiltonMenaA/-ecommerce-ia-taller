@@ -1,15 +1,14 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional
+from typing import Optional
 
-from app.domain.entities.chat_message import ChatMessage
-from app.domain.entities.product import Product
+from app.domain.entities import ChatMessage, Product
 
 
 class IProductRepository(ABC):
     """Contrato para operaciones de persistencia y consulta de productos."""
 
     @abstractmethod
-    def get_all(self) -> List[Product]:
+    def get_all(self) -> list[Product]:
         """Obtiene todos los productos disponibles en el repositorio.
 
         Retorna:
@@ -28,7 +27,7 @@ class IProductRepository(ABC):
         """
 
     @abstractmethod
-    def get_by_brand(self, brand: str) -> List[Product]:
+    def get_by_brand(self, brand: str) -> list[Product]:
         """Filtra productos por marca.
 
         Parametros:
@@ -39,7 +38,7 @@ class IProductRepository(ABC):
         """
 
     @abstractmethod
-    def get_by_category(self, category: str) -> List[Product]:
+    def get_by_category(self, category: str) -> list[Product]:
         """Filtra productos por categoria.
 
         Parametros:
@@ -60,6 +59,29 @@ class IProductRepository(ABC):
             El producto persistido.
         """
 
+    @abstractmethod
+    def update(self, product_id: str, product: Product) -> Optional[Product]:
+        """Actualiza un producto existente.
+
+        Parametros:
+            product_id: Identificador del producto a actualizar.
+            product: Nueva informacion del producto.
+
+        Retorna:
+            El producto actualizado o None si no existe.
+        """
+
+    @abstractmethod
+    def delete(self, product_id: str) -> bool:
+        """Elimina un producto por su identificador.
+
+        Parametros:
+            product_id: Identificador del producto a eliminar.
+
+        Retorna:
+            True si se elimino, False si no existia.
+        """
+
 
 class IChatRepository(ABC):
     """Contrato para operaciones de persistencia de conversaciones de chat."""
@@ -76,7 +98,7 @@ class IChatRepository(ABC):
         """
 
     @abstractmethod
-    def get_history(self, session_id: str) -> List[ChatMessage]:
+    def get_history(self, session_id: str) -> list[ChatMessage]:
         """Obtiene el historial completo de mensajes de una sesion.
 
         Parametros:

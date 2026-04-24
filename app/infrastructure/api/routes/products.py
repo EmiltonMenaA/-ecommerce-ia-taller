@@ -1,12 +1,25 @@
 """Rutas de API para gestión de productos."""
-from fastapi import APIRouter, Depends, HTTPException, status
-from typing import List
-from app.application import ProductService, ProductDTO, CreateProductDTO
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Response, status
+from sqlalchemy.orm import Session
+
+from app.application import (
+    CreateProductDTO,
+    ProductDTO,
+    ProductService,
+    UpdateProductDTO,
+)
+from app.domain import InvalidPriceError, ProductNotFoundError
+from app.infrastructure.database.connection import get_session
+from app.infrastructure.repositories import ProductRepository
 
 router = APIRouter(prefix="/products", tags=["Products"])
 
 
-def get_product_service(session=None) -> ProductService:
+def get_product_service(
+    session: Annotated[Session, Depends(get_session)],
+) -> ProductService:
     """Inyecta ProductService con dependencias.
 
     Parámetros:
@@ -15,19 +28,14 @@ def get_product_service(session=None) -> ProductService:
     Retorna:
         ProductService: Instancia del servicio configurada.
     """
-    if session is None:
-        from app.infrastructure.database import SessionLocal
-        session = SessionLocal()
-    
-    from app.infrastructure.repositories import ProductRepository
     repo = ProductRepository(session)
     return ProductService(repo)
 
 
-@router.get("", response_model=List[ProductDTO], status_code=status.HTTP_200_OK)
+@router.get("", response_model=list[ProductDTO], status_code=status.HTTP_200_OK)
 async def get_all_products(
-    service: ProductService = Depends(get_product_service),
-) -> List[ProductDTO]:
+    service: Annotated[ProductService, Depends(get_product_service)],
+) -> list[ProductDTO]:
     """Obtiene todos los productos disponibles.
 
     Retorna la lista completa de productos registrados en el catálogo
@@ -48,7 +56,7 @@ async def get_all_products(
 @router.get("/{product_id}", response_model=ProductDTO, status_code=status.HTTP_200_OK)
 async def get_product_by_id(
     product_id: int,
-    service: ProductService = Depends(get_product_service),
+    service: Annotated[ProductService, Depends(get_product_service)],
 ) -> ProductDTO:
     """Obtiene un producto específico por su identificador único.
 
@@ -69,22 +77,22 @@ async def get_product_by_id(
         200: Producto encontrado y retornado.
         404: El producto con el ID especificado no existe.
     """
-    product = service.get_product_by_id(str(product_id))
-    if not product:
+    try:
+        return service.get_product_by_id(str(product_id))
+    except ProductNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Producto no encontrado",
-        )
-    return product
+            detail=str(exc),
+        ) from exc
 
 
 @router.get(
-    "/brand/{brand}", response_model=List[ProductDTO], status_code=status.HTTP_200_OK
+    "/brand/{brand}", response_model=list[ProductDTO], status_code=status.HTTP_200_OK
 )
 async def get_products_by_brand(
     brand: str,
-    service: ProductService = Depends(get_product_service),
-) -> List[ProductDTO]:
+    service: Annotated[ProductService, Depends(get_product_service)],
+) -> list[ProductDTO]:
     """Filtra productos por marca.
 
     Retorna todos los productos que pertenecen a la marca especificada.
@@ -105,13 +113,13 @@ async def get_products_by_brand(
 
 @router.get(
     "/category/{category}",
-    response_model=List[ProductDTO],
+    response_model=list[ProductDTO],
     status_code=status.HTTP_200_OK,
 )
 async def get_products_by_category(
     category: str,
-    service: ProductService = Depends(get_product_service),
-) -> List[ProductDTO]:
+    service: Annotated[ProductService, Depends(get_product_service)],
+) -> list[ProductDTO]:
     """Filtra productos por categoría.
 
     Retorna todos los productos que pertenecen a la categoría especificada.
@@ -133,7 +141,7 @@ async def get_products_by_category(
 @router.post("", response_model=ProductDTO, status_code=status.HTTP_201_CREATED)
 async def create_product(
     product_data: CreateProductDTO,
-    service: ProductService = Depends(get_product_service),
+    service: Annotated[ProductService, Depends(get_product_service)],
 ) -> ProductDTO:
     """Crea un nuevo producto en el catálogo.
 
@@ -152,4 +160,47 @@ async def create_product(
         201: Producto creado exitosamente.
         422: Datos de entrada inválidos (validación fallida).
     """
-    return service.create_product(product_data)
+    try:
+        return service.create_product(product_data)
+    except InvalidPriceError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.put("/{product_id}", response_model=ProductDTO, status_code=status.HTTP_200_OK)
+async def update_product(
+    product_id: int,
+    product_data: UpdateProductDTO,
+    service: Annotated[ProductService, Depends(get_product_service)],
+) -> ProductDTO:
+    """Actualiza un producto existente por identificador."""
+    try:
+        return service.update_product(str(product_id), product_data)
+    except ProductNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except InvalidPriceError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_product(
+    product_id: int,
+    service: Annotated[ProductService, Depends(get_product_service)],
+) -> Response:
+    """Elimina un producto existente por identificador."""
+    try:
+        service.delete_product(str(product_id))
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    except ProductNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc

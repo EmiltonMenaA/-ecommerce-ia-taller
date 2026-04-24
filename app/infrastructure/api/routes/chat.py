@@ -1,18 +1,21 @@
 """Rutas de API para el chat inteligente con IA."""
-from fastapi import APIRouter, Depends, HTTPException, status
-from typing import Dict, Any
 import os
-from app.application import (
-    ChatService,
-    ChatRequestDTO,
-    ChatResponseDTO,
-    ChatHistoryDTO,
-)
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Response, status
+from sqlalchemy.orm import Session
+
+from app.application import ChatHistoryDTO, ChatRequestDTO, ChatResponseDTO, ChatService
+from app.domain import ChatSessionNotFoundError, GeminiAPIError
+from app.infrastructure.database.connection import get_session
+from app.infrastructure.repositories import ChatRepository, ProductRepository
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
 
-def get_chat_service(session=None) -> ChatService:
+def get_chat_service(
+    session: Annotated[Session, Depends(get_session)],
+) -> ChatService:
     """Inyecta ChatService con todas sus dependencias.
 
     Construye una instancia de ChatService configurando los repositorios
@@ -27,18 +30,23 @@ def get_chat_service(session=None) -> ChatService:
     Excepciones:
         ValueError: Si GEMINI_API_KEY no está configurada en variables de entorno.
     """
-    if session is None:
-        from app.infrastructure.database import SessionLocal
-        session = SessionLocal()
-    
-    from app.infrastructure.repositories import ChatRepository, ProductRepository
-    from app.infrastructure.external import GeminiService
-    
     chat_repo = ChatRepository(session)
     product_repo = ProductRepository(session)
     gemini_api_key = os.getenv("GEMINI_API_KEY")
     if not gemini_api_key:
-        raise ValueError("GEMINI_API_KEY no configurada en variables de entorno")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="GEMINI_API_KEY no configurada en variables de entorno",
+        )
+
+    try:
+        from app.infrastructure.external import GeminiService
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Dependencias de Gemini no disponibles en el entorno.",
+        ) from exc
+
     gemini_service = GeminiService(gemini_api_key)
     return ChatService(
         product_repository=product_repo,
@@ -50,7 +58,7 @@ def get_chat_service(session=None) -> ChatService:
 @router.post("", response_model=ChatResponseDTO, status_code=status.HTTP_200_OK)
 async def send_message(
     request: ChatRequestDTO,
-    service: ChatService = Depends(get_chat_service),
+    service: Annotated[ChatService, Depends(get_chat_service)],
 ) -> ChatResponseDTO:
     """Envía un mensaje al chat y obtiene respuesta de la IA.
 
@@ -75,11 +83,11 @@ async def send_message(
     """
     try:
         return service.process_message(request)
-    except Exception as e:
+    except GeminiAPIError as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Error al procesar mensaje: {str(e)}",
-        )
+        ) from e
 
 
 @router.get(
@@ -89,7 +97,7 @@ async def send_message(
 )
 async def get_chat_history(
     session_id: str,
-    service: ChatService = Depends(get_chat_service),
+    service: Annotated[ChatService, Depends(get_chat_service)],
 ) -> ChatHistoryDTO:
     """Obtiene el historial completo de chat de una sesión.
 
@@ -108,17 +116,23 @@ async def get_chat_history(
     Códigos HTTP:
         200: Operación exitosa, historial retornado (puede estar vacío).
     """
-    return service.get_chat_history(session_id)
+    try:
+        return service.get_chat_history(session_id)
+    except ChatSessionNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        ) from e
 
 
 @router.delete(
     "/history/{session_id}",
-    status_code=status.HTTP_200_OK,
+    status_code=status.HTTP_204_NO_CONTENT,
 )
 async def delete_chat_history(
     session_id: str,
-    service: ChatService = Depends(get_chat_service),
-) -> Dict[str, Any]:
+    service: Annotated[ChatService, Depends(get_chat_service)],
+) -> Response:
     """Elimina todo el historial de una sesión de chat.
 
     Remueve permanentemente todos los mensajes asociados a una sesión,
@@ -134,8 +148,11 @@ async def delete_chat_history(
     Códigos HTTP:
         200: Historial eliminado exitosamente.
     """
-    service.delete_chat_history(session_id)
-    return {
-        "message": "Historial eliminado correctamente",
-        "session_id": session_id,
-    }
+    try:
+        service.delete_chat_history(session_id)
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    except ChatSessionNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        ) from e

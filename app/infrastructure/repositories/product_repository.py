@@ -1,7 +1,7 @@
 """Implementación de repositorio de productos con SQLite y SQLAlchemy."""
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from app.domain.entities.product import Product
+from app.domain.entities import Product
 from app.domain.repositories import IProductRepository
 from app.infrastructure.database.models import ProductModel
 
@@ -35,7 +35,7 @@ class ProductRepository(IProductRepository):
             name=model.name,
             brand=model.brand,
             category=model.category,
-            size=model.size,
+            size=float(model.size),
             color=model.color,
             price=model.price,
             stock=model.stock,
@@ -50,7 +50,10 @@ class ProductRepository(IProductRepository):
         Retorna:
             ProductModel: Modelo ORM listo para persistir.
         """
-        product_id = int(product.id) if product.id else None
+        try:
+            product_id = int(product.id) if product.id else None
+        except (ValueError, TypeError):
+            product_id = None
         return ProductModel(
             id=product_id,
             name=product.name,
@@ -141,3 +144,64 @@ class ProductRepository(IProductRepository):
         self.session.commit()
         self.session.refresh(model)
         return self._model_to_entity(model)
+
+    def update(self, product_id: str, product: Product) -> Optional[Product]:
+        """Actualiza un producto existente por su identificador.
+
+        Parámetros:
+            product_id: Identificador del producto a actualizar.
+            product: Entidad Product con datos actualizados.
+
+        Retorna:
+            Entidad Product actualizada o None si no existe.
+        """
+        try:
+            product_id_int = int(product_id)
+        except (ValueError, TypeError):
+            return None
+
+        model = (
+            self.session.query(ProductModel)
+            .filter(ProductModel.id == product_id_int)
+            .first()
+        )
+        if model is None:
+            return None
+
+        model.name = product.name
+        model.brand = product.brand
+        model.category = product.category
+        model.size = product.size
+        model.color = product.color
+        model.price = product.price
+        model.stock = product.stock
+
+        self.session.commit()
+        self.session.refresh(model)
+        return self._model_to_entity(model)
+
+    def delete(self, product_id: str) -> bool:
+        """Elimina un producto por su identificador.
+
+        Parámetros:
+            product_id: Identificador del producto a eliminar.
+
+        Retorna:
+            True si se eliminó, False si no existe.
+        """
+        try:
+            product_id_int = int(product_id)
+        except (ValueError, TypeError):
+            return False
+
+        model = (
+            self.session.query(ProductModel)
+            .filter(ProductModel.id == product_id_int)
+            .first()
+        )
+        if model is None:
+            return False
+
+        self.session.delete(model)
+        self.session.commit()
+        return True

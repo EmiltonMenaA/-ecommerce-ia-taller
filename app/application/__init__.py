@@ -3,6 +3,7 @@ from app.application.services import ProductService, ChatService
 from app.application.dtos import (
 	ProductDTO,
 	CreateProductDTO,
+	UpdateProductDTO,
 	ChatMessageDTO,
 	ChatRequestDTO,
 	ChatResponseDTO,
@@ -14,6 +15,7 @@ __all__ = [
 	"ChatService",
 	"ProductDTO",
 	"CreateProductDTO",
+	"UpdateProductDTO",
 	"ChatMessageDTO",
 	"ChatRequestDTO",
 	"ChatResponseDTO",

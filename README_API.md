@@ -127,7 +127,7 @@ app/
 └── tests/                 # Tests automáticos
 ```
 
-## 🔧 Tecnologías
+##  Tecnologías
 
 - **Framework**: FastAPI
 - **BD**: SQLite + SQLAlchemy
@@ -135,14 +135,14 @@ app/
 - **Validación**: Pydantic
 - **Servidor**: Uvicorn
 
-## 📌 Notas
+##  Notas
 
 - La base de datos SQLite se crea automáticamente en `ecommerce.db`
 - Los mensajes de chat se guardan en `chat_messages` tabla
 - Los productos se guardan en `products` tabla
 - La API está documentada con Swagger en `/docs`
 
-## ⚠️ Troubleshooting
+##  Troubleshooting
 
 ### Error: "ModuleNotFoundError: No module named 'sqlalchemy'"
 

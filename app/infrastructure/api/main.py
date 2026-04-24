@@ -1,6 +1,5 @@
 """Aplicación FastAPI principal - Configuración y setup de la API REST."""
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse
 
 # Crear instancia de FastAPI
 app = FastAPI(
@@ -13,15 +12,24 @@ app = FastAPI(
 )
 
 # Incluir routers de rutas (lazy loading)
-def _include_routers():
+def _include_routers() -> None:
     """Incluye los routers de la API (llamado en startup)."""
-    from app.infrastructure.api.routes import products_router, chat_router
+    from app.infrastructure.api.routes import (
+        chat_router,
+        chat_simple_router,
+        products_router,
+    )
+
     app.include_router(products_router)
     app.include_router(chat_router)
+    app.include_router(chat_simple_router)
 
 @app.on_event("startup")
-async def startup_event():
+async def startup_event() -> None:
     """Evento de startup para inicializar la aplicación."""
+    from app.infrastructure.database.init import create_tables
+
+    create_tables()
     _include_routers()
 
 
@@ -46,6 +54,7 @@ async def root() -> dict:
         "endpoints": {
             "products": "/products",
             "chat": "/chat",
+            "chat_test": "/chat/test",
             "health": "/health",
         },
     }
